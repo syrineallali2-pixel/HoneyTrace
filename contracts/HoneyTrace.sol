@@ -353,4 +353,161 @@ contract HoneyTrace is AccessControl {
         return batchHistory[batchId];
     }
 
+
+    // ==========================================
+    // 11. RECORD PROCESSING
+    // ==========================================
+
+    function recordProcessing(
+        uint256 batchId,
+        string calldata location,
+        string calldata notes
+    )
+        external
+        onlyRole(PROCESSOR_ROLE)
+    {
+        HoneyBatch storage batch = batches[batchId];
+
+        require(
+            batch.exists,
+            "HoneyTrace: batch does not exist"
+        );
+
+        require(
+            batch.status == BatchStatus.HARVESTED,
+            "HoneyTrace: batch must be harvested"
+        );
+
+        _recordStage(
+            batchId,
+            BatchStatus.PROCESSED,
+            location,
+            notes
+        );
+    }
+
+
+    // ==========================================
+    // 12. RECORD SHIPMENT
+    // ==========================================
+
+    function recordShipment(
+        uint256 batchId,
+        string calldata location,
+        string calldata notes
+    )
+        external
+        onlyRole(DISTRIBUTOR_ROLE)
+    {
+        HoneyBatch storage batch = batches[batchId];
+
+        require(
+            batch.exists,
+            "HoneyTrace: batch does not exist"
+        );
+
+        require(
+            batch.status == BatchStatus.PROCESSED,
+            "HoneyTrace: batch must be processed"
+        );
+
+        _recordStage(
+            batchId,
+            BatchStatus.SHIPPED,
+            location,
+            notes
+        );
+    }
+
+
+    // ==========================================
+    // 13. RECORD RECEPTION
+    // ==========================================
+
+    function recordReception(
+        uint256 batchId,
+        string calldata location,
+        string calldata notes
+    )
+        external
+        onlyRole(RETAILER_ROLE)
+    {
+        HoneyBatch storage batch = batches[batchId];
+
+        require(
+            batch.exists,
+            "HoneyTrace: batch does not exist"
+        );
+
+        require(
+            batch.status == BatchStatus.SHIPPED,
+            "HoneyTrace: batch must be shipped"
+        );
+
+        _recordStage(
+            batchId,
+            BatchStatus.RECEIVED,
+            location,
+            notes
+        );
+    }
+
+
+    // ==========================================
+    // 14. INTERNAL TRACEABILITY HELPER
+    // ==========================================
+
+    function _recordStage(
+        uint256 batchId,
+        BatchStatus newStatus,
+        string memory location,
+        string memory notes
+    )
+        internal
+    {
+        require(
+            bytes(location).length > 0,
+            "HoneyTrace: empty location"
+        );
+
+        require(
+            bytes(notes).length > 0,
+            "HoneyTrace: empty notes"
+        );
+
+        // Update the current batch status
+
+        batches[batchId].status = newStatus;
+
+        // Append a new historical event
+
+        batchHistory[batchId].push(
+            TraceabilityEvent({
+
+                stage: newStatus,
+
+                actor: msg.sender,
+
+                timestamp: block.timestamp,
+
+                location: location,
+
+                notes: notes
+
+            })
+        );
+
+        // Publish the traceability event
+
+        emit TraceabilityEventRecorded(
+            batchId,
+            newStatus,
+            msg.sender,
+            block.timestamp,
+            location,
+            notes
+        );
+    }
+
+
 }
